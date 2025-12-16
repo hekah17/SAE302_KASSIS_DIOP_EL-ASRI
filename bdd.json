@@ -29,14 +29,14 @@
         {
       "from": "Antoine",
       "to": "Heloise",
-      "content": "Salut , ça va ?",
+      "content": "Salut , gagak c'est gougouk",
       "timestamp": "2025-10-27 14:00:00",
       "read": true
     },
     {
       "from": "Heloise",
       "to": "Antoine",
-      "content": "Oui et toi ?",
+      "content": "ohhh ouiiiiii",
       "timestamp": "2025-10-27 14:05:00",
       "read": false
     }
