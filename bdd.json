@@ -1,0 +1,44 @@
+{
+    "users": {
+        "Sarah": {
+            "Prenom Nom": "Sarah Kassis",
+            "Password": "sarah123",
+            "Role": "admin",
+            "Contact": []
+        },
+        "Antoine":{
+            "Prenom Nom": "Antoine Daniel",
+            "Password": "ad123ad",
+            "Role": "user",
+            "Contact": []
+        },
+        "Heloise":{
+            "Prenom Nom": "Heloise Kassis",
+            "Password": "heloise12345",
+            "Role": "admin",
+            "Contact": []
+        },
+        "Toto":{
+            "Prenom Nom": "Toto Toto",
+            "Password": "123toto123",
+            "Role": "user",
+            "Contact": []
+        }
+    },
+    "messages": [
+        {
+      "from": "Antoine",
+      "to": "Heloise",
+      "content": "Salut , ça va ?",
+      "timestamp": "2025-10-27 14:00:00",
+      "read": true
+    },
+    {
+      "from": "Heloise",
+      "to": "Antoine",
+      "content": "Oui et toi ?",
+      "timestamp": "2025-10-27 14:05:00",
+      "read": false
+    }
+  ]
+}
