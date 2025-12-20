@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask_socketio import SocketIO, send
 from models import db, User
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
@@ -21,8 +21,15 @@ with app.app_context():
     db.create_all()
 
 @app.route('/') #quand on tape l'adresse du site à sa racine
-def index():
-    return render_template('chat.html') #on retourne la page chat.html, dans le dossier templates
+@login_required
+def chat():
+    return render_template('chat.html', user=current_user) #on retourne la page chat.html, dans le dossier templates
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
 
 @socketio.on('message') #on met le serveur en écoute du moindre evenement
 def handle_message(msg): #msg=le message envoyé
@@ -51,6 +58,22 @@ def register():
         return redirect(url_for('login'))
     
     return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        user = User.query.filter_by(username=username).first()
+        
+        if user and check_password_hash(user.password_hash, password):
+            login_user(user)
+            return redirect(url_for('chat'))
+        else:
+            flash('Email ou mot de passe incorrect.', 'error')
+            
+    return render_template('login.html')
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)#on lance l'application avec le socket pour le coté instantané, avec debug en on pour avoir les log d'erreur
