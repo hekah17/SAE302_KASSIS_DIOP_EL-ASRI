@@ -87,6 +87,21 @@
             var currentRoomId = null;
             var myUsername = "{{ user.username }}";
 
+            function afficherMessage(sender, msg, timestamp) {
+                var cssClass = (sender === myUsername) ? 'sent' : 'received';
+                var senderLabel = (sender === myUsername) ? 'Moi' : sender;
+
+                var html = `
+                    <div class="message-bubble ${cssClass}">
+                        <div class="message-info">${senderLabel} • ${timestamp}</div>
+                        ${msg}
+                    </div>
+                `;
+                
+                $('#messages').append(html);
+                $('#messages').scrollTop($('#messages')[0].scrollHeight);
+            }
+
             $('.friend-item').on('click', function() {
                 $('.friend-item').removeClass('active');
                 $(this).addClass('active');
@@ -95,31 +110,26 @@
                 var friendName = $(this).data('name');
 
                 $('#chat-title').text('Discussion avec ' + friendName);
-                $('#messages').empty();
-                $('#messages').append('<div style="text-align:center; color:gray; margin-top:20px;">Début de la discussion</div>');
                 $('#input-area').show();
+                
+                $('#messages').empty();
+
+                $.get('/get_history/' + currentRecipientId, function(history) {
+                    history.forEach(function(message) {
+                        afficherMessage(message.sender, message.msg, message.timestamp);
+                    });
+                });
 
                 socket.emit('join_private_chat', {'friend_id': currentRecipientId});
             });
 
             socket.on('room_joined', function(data) {
                 currentRoomId = data.room_id;
-                console.log("Connecté à la salle : " + currentRoomId);
             });
 
             socket.on('message_recu', function(data) {
-                var cssClass = (data.sender === myUsername) ? 'sent' : 'received';
-                var senderName = (data.sender === myUsername) ? 'Moi' : data.sender;
-
-                var html = `
-                    <div class="message-bubble ${cssClass}">
-                        <div class="message-info">${senderName} • ${data.timestamp}</div>
-                        ${data.msg}
-                    </div>
-                `;
-                
-                $('#messages').append(html);
-                $('#messages').scrollTop($('#messages')[0].scrollHeight);
+                // On réutilise notre super fonction
+                afficherMessage(data.sender, data.msg, data.timestamp);
             });
 
             $('#sendBtn').on('click', function() {

@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_socketio import SocketIO, send, join_room, emit
 from models import db, User, Message
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
+from sqlalchemy import or_
 
 app = Flask(__name__) #création de l'application __name__
 app.config['SECRET_KEY'] = 'secret!' #mesure de sécurité de flask
@@ -111,6 +112,25 @@ def add_friend():
         flash("Utilisateur introuvable.", 'error')
         
     return redirect(url_for('chat'))
+
+@app.route('/get_history/<int:friend_id>')
+@login_required
+def get_history(friend_id):
+    messages = Message.query.filter(
+        or_(
+            (Message.sender_id == current_user.id) & (Message.recipient_id == friend_id),
+            (Message.sender_id == friend_id) & (Message.recipient_id == current_user.id)
+        )
+    ).order_by(Message.timestamp.asc()).all()
+    history = []
+    for msg in messages:
+        history.append({
+            'sender': msg.author.username,
+            'msg': msg.content,
+            'timestamp': msg.timestamp.strftime('%H:%M')
+        })
+
+    return jsonify(history)
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)#on lance l'application avec le socket pour le coté instantané, avec debug en on pour avoir les log d'erreur
