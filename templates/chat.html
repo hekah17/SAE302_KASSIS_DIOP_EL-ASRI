@@ -2,31 +2,142 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Messagerie Instantanée</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script><!--import de librairie javascript-->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script><!--import de librairie javascript-->
+    <title>Chat Privé</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    
+    <style>
+        body { margin: 0; font-family: sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        #sidebar { width: 300px; background-color: #2c3e50; color: white; display: flex; flex-direction: column; border-right: 1px solid #ddd; }
+        #sidebar-header { padding: 20px; background-color: #1a252f; }
+        #add-friend-form { padding: 10px; border-bottom: 1px solid #34495e; }
+        #add-friend-form input { width: 65%; padding: 5px; }
+        #add-friend-form button { width: 30%; cursor: pointer; }
+        #friends-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
+        .friend-item { padding: 15px; cursor: pointer; border-bottom: 1px solid #34495e; transition: background 0.3s; }
+        .friend-item:hover { background-color: #34495e; }
+        .friend-item.active { background-color: #2980b9; }
+        #chat-area { flex-grow: 1; display: flex; flex-direction: column; background-color: #ecf0f1; }
+        #chat-header { padding: 15px; background-color: #fff; border-bottom: 1px solid #ddd; font-weight: bold; font-size: 1.2em; height: 50px; display: flex; align-items: center; }
+        #messages { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .message-bubble { max-width: 60%; padding: 10px 15px; border-radius: 20px; position: relative; word-wrap: break-word; }
+        .message-info { font-size: 0.75em; margin-bottom: 5px; opacity: 0.7;} 
+        .sent { align-self: flex-end; background-color: #dcf8c6; border-bottom-right-radius: 0; }
+        .received { align-self: flex-start; background-color: #fff; border-bottom-left-radius: 0; box-shadow: 0 1px 2px rgba(0,0,0,0.1);}
+        #input-area { padding: 20px; background-color: #fff; display: flex; gap: 10px; border-top: 1px solid #ddd; }
+        #myMessage { flex-grow: 1; padding: 10px; border-radius: 20px; border: 1px solid #ccc; }
+        #sendBtn { padding: 10px 20px; border-radius: 20px; border: none; background-color: #2980b9; color: white; cursor: pointer; }
+        .alert { padding: 10px; margin: 10px; border-radius: 5px; text-align: center; }
+        .alert.error { background-color: #e74c3c; }
+        .alert.success { background-color: #2ecc71; }
+    </style>
 </head>
 <body>
 
-    <h1>Messagerie</h1>
-    
-    <ul id="messages"></ul>
+    <div id="sidebar">
+        <div id="sidebar-header">
+            Mon Profil : <strong>{{ user.username }}</strong>
+            <br><small><a href="{{ url_for('logout') }}" style="color: #bdc3c7;">Se déconnecter</a></small>
+        </div>
 
-    <input type="text" id="myMessage" placeholder="Tape quelque chose...">
-    <button id="sendBtn">Envoyer</button>
+        <div id="add-friend-form">
+            <form action="{{ url_for('add_friend') }}" method="POST">
+                <input type="text" name="username" placeholder="Pseudo ami..." required>
+                <button type="submit">+</button>
+            </form>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <ul id="friends-list">
+            {% for friend in user.friends %}
+                <li class="friend-item" data-id="{{ friend.id }}" data-name="{{ friend.username }}">
+                    Bubulle avec : {{ friend.username }}
+                </li>
+            {% else %}
+                <li style="padding: 15px; color: gray;">Aucun ami pour l'instant. Ajoutez-en un !</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div id="chat-area">
+        <div id="chat-header">
+            <span id="chat-title">Sélectionnez un ami pour discuter</span>
+        </div>
+
+        <div id="messages">
+            </div>
+
+        <div id="input-area" style="display: none;"> <input type="text" id="myMessage" placeholder="Écrivez votre message...">
+            <button id="sendBtn">Envoyer</button>
+        </div>
+    </div>
 
     <script type="text/javascript">
-        $(document).ready(function() { //Attente jusqu'à chargement complet de la page
-            var socket = io(); //ouverture de la communication instantanée 
+        $(document).ready(function() {
+            var socket = io();
+            
+            var currentRecipientId = null;
+            var currentRoomId = null;
+            var myUsername = "{{ user.username }}";
 
-            $('#sendBtn').on('click', function() { //pour chaque evenement qui à l'id sendBtn
-                var message = $('#myMessage').val(); //on met ce qu'il y a dans myMessage dans une variable message
-                socket.send(message); //envoie du message vers le serveur
-                $('#myMessage').val(''); //on vide la variable pour le prochain message
+            $('.friend-item').on('click', function() {
+                $('.friend-item').removeClass('active');
+                $(this).addClass('active');
+
+                currentRecipientId = $(this).data('id');
+                var friendName = $(this).data('name');
+
+                $('#chat-title').text('Discussion avec ' + friendName);
+                $('#messages').empty();
+                $('#messages').append('<div style="text-align:center; color:gray; margin-top:20px;">Début de la discussion</div>');
+                $('#input-area').show();
+
+                socket.emit('join_private_chat', {'friend_id': currentRecipientId});
             });
 
-            socket.on('message', function(msg) { //qi le serveur cree un event avec le tag message
-                $('#messages').append('<li>' + msg + '</li>'); //dans la pile de message, on append le message recu dans la pile de messages
+            socket.on('room_joined', function(data) {
+                currentRoomId = data.room_id;
+                console.log("Connecté à la salle : " + currentRoomId);
+            });
+
+            socket.on('message_recu', function(data) {
+                var cssClass = (data.sender === myUsername) ? 'sent' : 'received';
+                var senderName = (data.sender === myUsername) ? 'Moi' : data.sender;
+
+                var html = `
+                    <div class="message-bubble ${cssClass}">
+                        <div class="message-info">${senderName} • ${data.timestamp}</div>
+                        ${data.msg}
+                    </div>
+                `;
+                
+                $('#messages').append(html);
+                $('#messages').scrollTop($('#messages')[0].scrollHeight);
+            });
+
+            $('#sendBtn').on('click', function() {
+                var messageText = $('#myMessage').val();
+                
+                if (messageText.trim() !== "" && currentRoomId) {
+                    socket.emit('private_message', {
+                        'message': messageText,
+                        'recipient_id': currentRecipientId,
+                        'room_id': currentRoomId
+                    });
+                    
+                    $('#myMessage').val('');
+                }
+            });
+
+            $('#myMessage').keypress(function(e) {
+                if(e.which == 13) { $('#sendBtn').click(); }
             });
         });
     </script>

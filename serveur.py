@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_socketio import SocketIO, send
-from models import db, User
+from flask_socketio import SocketIO, send, join_room, emit
+from models import db, User, Message
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 
 app = Flask(__name__) #création de l'application __name__
@@ -31,10 +31,26 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-@socketio.on('message') #on met le serveur en écoute du moindre evenement
-def handle_message(msg): #msg=le message envoyé
-    print('Message reçu du client: ' + msg) #le print est dans le terminale, c'est orienté dev
-    send(msg, broadcast=True) #envoie le message en broadcast
+@socketio.on('join_private_chat')
+def handle_join_private(data):
+    friend_id = data['friend_id']
+    room_id = f"{min(current_user.id, int(friend_id))}-{max(current_user.id, int(friend_id))}"
+    join_room(room_id)
+    emit('room_joined', {'room_id': room_id})
+
+@socketio.on('private_message')
+def handle_private_message(data):
+    msg_content = data['message']
+    recipient_id = data['recipient_id']
+    room_id = data['room_id']
+    new_msg = Message(content=msg_content, sender_id=current_user.id, recipient_id=recipient_id)
+    db.session.add(new_msg)
+    db.session.commit()
+    emit('message_recu', {
+        'msg': msg_content, 
+        'sender': current_user.username,
+        'timestamp': new_msg.timestamp.strftime('%H:%M')
+    }, room=room_id)
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -74,6 +90,27 @@ def login():
             flash('Email ou mot de passe incorrect.', 'error')
             
     return render_template('login.html')
+
+@app.route('/add_friend', methods=['POST'])
+@login_required
+def add_friend():
+    username = request.form['username']
+    friend_to_add = User.query.filter_by(username=username).first()
+    
+    if friend_to_add:
+        if friend_to_add == current_user:
+            flash("Vous ne pouvez pas vous ajouter vous-même !", 'error')
+        elif friend_to_add in current_user.friends:
+            flash("Vous êtes déjà amis.", 'info')
+        else:
+            current_user.friends.append(friend_to_add)
+            friend_to_add.friends.append(current_user)
+            db.session.commit()
+            flash(f'{username} a été ajouté à vos amis !', 'success')
+    else:
+        flash("Utilisateur introuvable.", 'error')
+        
+    return redirect(url_for('chat'))
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)#on lance l'application avec le socket pour le coté instantané, avec debug en on pour avoir les log d'erreur
