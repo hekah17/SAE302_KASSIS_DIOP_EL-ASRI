@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Inscription - Chat Aero</title>
+    <title>SAE302 ● Inscription</title>
     <style>
         body {
             margin: 0;
@@ -74,11 +74,11 @@
 <body>
     <form method="POST">
         <h2>Créer un compte</h2>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
+        <!--bloc d'affichage des message flash-->
+        {% with messages = get_flashed_messages(with_categories=true) %} <!--recuparation de l'étiquette du message-->
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert {{ category }}">{{ message }}</div>
+                    <div class="alert {{ category }}">{{ message }}</div><!--category est soit erreur soit succès et message est la chaien dans le flash de serveur.py-->
                 {% endfor %}
             {% endif %}
         {% endwith %}

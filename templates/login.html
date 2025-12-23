@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Connexion - Chat Aero</title>
+    <title>SAE302 ● Connexion</title>
     <style>
         body {
             margin: 0;
@@ -94,13 +94,13 @@
             {% endif %}
         {% endwith %}
 
-        <label>Pseudo :</label>
+        <label>Pseudonyme :</label>
         <input type="text" name="username" required>
 
         <label>Mot de passe :</label>
         <input type="password" name="password" required>
 
-        <button type="submit">Entrer</button>
+        <button type="submit">Se connecter</button>
         
         <p>
             Pas de compte ? <a href="{{ url_for('register') }}">S'inscrire</a>

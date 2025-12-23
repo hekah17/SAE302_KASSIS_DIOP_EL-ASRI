@@ -2,8 +2,8 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Chat Privé Aero</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <title>SAE302 ● {{ user.username }}</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script> <!--équivalent des imports-->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     
     <style>
@@ -182,26 +182,27 @@
         .alert.success { background: #eaffea; color: #008000; border-color: #ccffcc; }
     </style>
 </head>
-<body>
 
-    <div id="sidebar">
+<body>
+    <div id="sidebar"><!--Toute la gauche de l'écarn-->
         <div id="sidebar-header">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/9/93/Default_profile_picture_%28male%29_on_Facebook.jpg" style="width: 30px; height: 30px; border-radius: 5px; vertical-align: middle; border: 1px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); margin-right:5px;" alt="Avatar">
-            <strong>{{ user.username }}</strong>
-            <br><small><a href="{{ url_for('logout') }}">(Se déconnecter)</a></small>
+            <img src="{{ url_for('static', filename='chat/default_pp.png') }}" style="width: 30px; height: 30px; border-radius: 5px; vertical-align: middle; border: 1px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); margin-right:5px;" alt="Profile Picture">
+            <strong>{{ user.username }}</strong><!--Les accolade sont pour flask, avec lesquelles il remplace ce qu'il y a à l'interieur par le pseudo de l'user connecté envoyé par serveur.py-->
+            <br><small><a href="{{ url_for('logout') }}">(Se déconnecter)</a></small><!--lien pour la déconnection-->
         </div>
 
         <div id="add-friend-form">
-            <form action="{{ url_for('add_friend') }}" method="POST">
+            <form action="{{ url_for('add_friend') }}" method="POST"><!--connecte le formulaire à la fonction d'ajout d'amis-->
                 <input type="text" name="username" placeholder="Pseudo ami..." required>
                 <button type="submit" title="Ajouter un contact">+</button>
             </form>
         </div>
 
+        <!--l'accolade et le pourcent servent à faire des boucles-->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert {{ category }}">{{ message }}</div>
+                    <div class="alert {{ category }}">{{ message }}</div><!--categorie devient doit error ou sucess et sert pour le style-->
                 {% endfor %}
             {% endif %}
         {% endwith %}
@@ -210,7 +211,6 @@
             {% for friend in user.friends %}
                 <li class="friend-item" data-id="{{ friend.id }}" data-name="{{ friend.username }}">
                     <span style="flex-grow:1;">{{ friend.username }}</span>
-                    <span style="font-size:0.7em; color:green;">● En ligne</span>
                 </li>
             {% else %}
                 <li style="padding: 15px; color: #555; text-align: center; font-style: italic;">
@@ -220,101 +220,104 @@
         </ul>
     </div>
 
-    <div id="chat-area">
+    <div id="chat-area"> <!--partie droite de l'écran-->
         <div id="chat-header">
             <span id="chat-title">Sélectionnez un contact pour démarrer une conversation</span>
         </div>
 
         <div id="messages">
             <div style="text-align: center; color: #aaa; margin-top: 50px;">
-                <h1 style="font-size: 3em; opacity: 0.3;">Chat Aero</h1>
-                <p>Messagerie Instantanée Sécurisée</p>
+                <h1 style="font-size: 3em; opacity: 0.3;">Discussion</h1>
+                <p>Discutez avec vos amis !</p>
             </div>
         </div>
 
-        <div id="input-area" style="display: none;"> 
+        <div id="input-area" style="display: none;"> <!--zone cacher tant que le contact n'est aps selectionné-->
             <input type="text" id="myMessage" placeholder="Écrivez un message...">
             <button id="sendBtn">Envoyer</button>
         </div>
     </div>
 
     <script type="text/javascript">
-        $(document).ready(function() {
-            var socket = io();
+        $(document).ready(function() {//on attend que toute la page soit chargée
+            var socket = io();//démarrage de la connexion avec le socket
             
-            var currentRecipientId = null;
-            var currentRoomId = null;
-            var myUsername = "{{ user.username }}";
+            var currentRecipientId = null; //initialisation d'une variable pour le destinataire 
+            var currentRoomId = null; //initialisation d'une variable de l'id de la room de discussion
+            var myUsername = "{{ user.username }}"; //initialisation du pseudo de l'user
 
+            //fontion d'affichage de la bulle de chat
             function afficherMessage(sender, msg, timestamp) {
-                var cssClass = (sender === myUsername) ? 'sent' : 'received';
-                var senderLabel = (sender === myUsername) ? 'Moi' : sender;
-
+                //style de la bulle (couleur et pseudo)
+                var cssClass = (sender === myUsername) ? 'sent' : 'received'; //sent = vert, c'est l'user qui l'envoie et received = gris c'est l'user que la recoie
+                var senderLabel = (sender === myUsername) ? 'Moi' : sender; //le pseudo afficher sur la bulle 
+                
                 var html = `
                     <div class="message-bubble ${cssClass}">
                         <div class="message-info">${senderLabel} • ${timestamp}</div>
                         ${msg}
                     </div>
-                `;
+                `;//squelette de l'affichage des bulle sans les var
                 
-                // Si c'est le premier message après le placeholder, on vide le div
-                if ($('#messages').find('h1').length > 0) {
-                     $('#messages').empty();
+                if ($('#messages').find('h1').length > 0) { //localisation du titre sur la zone où il y aura le chat
+                     $('#messages').empty(); //si oui, on vide cette zone
                 }
 
-                $('#messages').append(html);
-                $('#messages').scrollTop($('#messages')[0].scrollHeight);
+                $('#messages').append(html);// on ajoute le code html fait plus tot à la place
+                $('#messages').scrollTop($('#messages')[0].scrollHeight); //Scroll au dernier message de la discussion
             }
-
+            
+            //lorsqu'on click sur le feed de discussion d'un amis
             $('.friend-item').on('click', function() {
-                $('.friend-item').removeClass('active');
-                $(this).addClass('active');
+                $('.friend-item').removeClass('active'); //on reset le style de tout les items
+                $(this).addClass('active'); //on associe le style à l'item nouvellement cliqué
 
-                currentRecipientId = $(this).data('id');
-                var friendName = $(this).data('name');
+                currentRecipientId = $(this).data('id'); //extraction de l'id de l'amis avec lequel on discute
+                var friendName = $(this).data('name'); //extraction du nom de l'amis avec lequel on discute
 
-                $('#chat-title').html('<span style="color:green; font-size:1.5em; vertical-align:middle;">●</span> Discussion avec ' + friendName);
-                $('#input-area').show();
+                $('#chat-title').html('Discussion avec ' + friendName); //changement du titre du chat
+                $('#input-area').show(); //on change l'état du bouton d'envoie et de la zone d'écriture à visible car on à choisi un contact à qui parlé
                 
-                $('#messages').empty();
+                $('#messages').empty(); //on efface les messages de la conversation précédente
 
-                $.get('/get_history/' + currentRecipientId, function(history) {
-                    if(history.length === 0) {
+                $.get('/get_history/' + currentRecipientId, function(history) { //le navigateur va chercher les infos sur /get_history sans recharger la page
+                    if(history.length === 0) { //si il n'y a pas d'historique
                         $('#messages').append('<div style="text-align:center; color:#888; margin-top:20px; font-style:italic;">Aucun historique de conversation.</div>');
                     }
-                    history.forEach(function(message) {
-                        afficherMessage(message.sender, message.msg, message.timestamp);
+                    history.forEach(function(message) { //si il y a un historique, pour chaque message
+                        afficherMessage(message.sender, message.msg, message.timestamp); //on appelle la fonction des bulles de message
                     });
                 });
 
-                socket.emit('join_private_chat', {'friend_id': currentRecipientId});
+                socket.emit('join_private_chat', {'friend_id': currentRecipientId}); //envoie un message au serveur pour demander à join la room de discution
             });
 
             socket.on('room_joined', function(data) {
                 currentRoomId = data.room_id;
-            });
+            }); //quand la navigateur recois room_joined du serveur, le navigateur note l'id de la room
 
             socket.on('message_recu', function(data) {
                 afficherMessage(data.sender, data.msg, data.timestamp);
-            });
+            }); //lorsque le navigateur recois message_recu, il lance afficherMessage
 
+            //quand on appuie sur Envoyer
             $('#sendBtn').on('click', function() {
-                var messageText = $('#myMessage').val();
+                var messageText = $('#myMessage').val(); //extraction 
                 
-                if (messageText.trim() !== "" && currentRoomId) {
+                if (messageText.trim() !== "" && currentRoomId) { //si le message n'est pas vide et qu'on a un id de room de discussion
                     socket.emit('private_message', {
                         'message': messageText,
                         'recipient_id': currentRecipientId,
                         'room_id': currentRoomId
-                    });
+                    });// envoie du message au serveur
                     
-                    $('#myMessage').val('');
+                    $('#myMessage').val(''); //reset de la var pour le prochain message
                 }
             });
 
             $('#myMessage').keypress(function(e) {
                 if(e.which == 13) { $('#sendBtn').click(); }
-            });
+            }); //on ecoute tout le clavier et quand la touch entrer (13) est input, on peut envoyer le message
         });
     </script>
 </body>
