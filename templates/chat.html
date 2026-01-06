@@ -210,6 +210,8 @@
             </form>
         </div>
 
+        
+
         <!--l'accolade et le pourcent servent à faire des boucles-->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -232,6 +234,33 @@
             {% endfor %}
         </ul>
     </div>
+
+    <div id="sidebar-header" style="margin-top:15px; border-top: 1px solid #a0bfe4;">
+        <strong>Groupes</strong>
+    </div>
+
+    <div id="create-group-area" style="padding: 10px; font-size: 0.8em; background: rgba(255,255,255,0.2);">
+        <form action="{{ url_for('create_group') }}" method="POST">
+            <input type="text" name="group_name" placeholder="Nom du groupe..." required style="width: 90%; margin-bottom: 5px;">
+            <div style="max-height: 100px; overflow-y: auto; background: white; padding: 5px; border-radius: 4px;">
+                <p style="margin: 0 0 5px 0;">Choisir membres (max 49) :</p>
+                {% for friend in user.friends %}
+                    <label style="display: block;">
+                        <input type="checkbox" name="friends_to_add" value="{{ friend.id }}"> {{ friend.username }}
+                    </label>
+                {% endfor %}
+            </div>
+            <button type="submit" style="margin-top: 5px; width: 100%;">Créer Groupe</button>
+        </form>
+    </div>
+
+    <ul id="groups-list">
+        {% for group in user.groups %}
+            <li class="group-item" data-id="{{ group.id }}" data-name="{{ group.name }}">
+                <span style="flex-grow:1;">👥 {{ group.name }}</span>
+            </li>
+        {% endfor %}
+    </ul>
 
     <div id="chat-area"> <!--partie droite de l'écran-->
         <div id="chat-header">
@@ -256,7 +285,8 @@
             var socket = io();//démarrage de la connexion avec le socket
             
             var currentRecipientId = null; //initialisation d'une variable pour le destinataire 
-            var currentRoomId = null; //initialisation d'une variable de l'id de la room de discussion
+            var currentRoomId = null; //initialisation d'une variable de l'id de la room de discussion privé
+            var currentGroupId = null; //initialisation d'une variable de l'id de la room de discussion de groupe
             var myUsername = "{{ user.username }}"; //initialisation du pseudo de l'user
             
             function updateBadge(friendId, count) {
@@ -324,40 +354,87 @@
                 socket.emit('join_private_chat', {'friend_id': currentRecipientId}); //envoie un message au serveur pour demander à join la room de discution
             });
 
+            $(document).on('click', '.group-item', function() { //quand on clique sur le feed d'un group
+                $('.friend-item, .group-item').removeClass('active');
+                $(this).addClass('active');
+                
+                currentGroupId = $(this).data('id'); //on prend l'id du group
+                currentRecipientId = null; //changement de la varibale d'id pricé en null
+                var groupName = $(this).data('name'); //crea de la var de nom du group
+
+                $('#chat-title').html('Groupe : ' + groupName);
+                $('#input-area').show();
+                $('#messages').empty();
+
+                $.get('/get_group_history/' + currentGroupId, function(history) {
+                    if(history.length === 0) {
+                        $('#messages').append('<div style="text-align:center; color:#888; margin-top:20px; font-style:italic;">Début de la discussion de groupe.</div>');
+                    }
+                    history.forEach(function(message) {
+                        afficherMessage(message.sender, message.msg, message.timestamp);
+                    });
+                });
+
+                socket.emit('join_group_chat', {'group_id': currentGroupId});
+            });
+
             socket.on('room_joined', function(data) {
                 currentRoomId = data.room_id;
             }); //quand la navigateur recois room_joined du serveur, le navigateur note l'id de la room
 
             socket.on('message_recu', function(data) {
-                if (data.sender_id == currentRecipientId || data.sender === myUsername) { 
+                if (data.group_id && data.group_id == currentGroupId) {
                     afficherMessage(data.sender, data.msg, data.timestamp);
-                } //si on est en ligne, en discussion, on affiche le message normalement, instantanément, sans mise à jour du badge
-                else {
+                } //quand on a un message sur le groupe et le feed de discussion est ouvert
+                else if (!data.group_id && (data.sender_id == currentRecipientId || data.sender === myUsername)) {
+                    afficherMessage(data.sender, data.msg, data.timestamp);
+                } //quand on a un messsage sur une discussion privé et que le feed est ouvert
+                else if (!data.group_id && data.sender_id) {
                     var badge = $('#badge-' + data.sender_id);
                     var currentCount = parseInt(badge.text()) || 0;
-                    
                     updateBadge(data.sender_id, currentCount + 1);
                 } //si on est pas en discussion, on actualise le badge de notification incrémentalement
             });
 
             //quand on appuie sur Envoyer
             $('#sendBtn').on('click', function() {
-                var messageText = $('#myMessage').val(); //extraction 
-                
-                if (messageText.trim() !== "" && currentRoomId) { //si le message n'est pas vide et qu'on a un id de room de discussion
-                    socket.emit('private_message', {
+                var messageText = $('#myMessage').val();
+        
+                if (messageText.trim() !== "" && currentRoomId) {
+                    var payload = {
                         'message': messageText,
-                        'recipient_id': currentRecipientId,
                         'room_id': currentRoomId
-                    });// envoie du message au serveur
-                    
-                    $('#myMessage').val(''); //reset de la var pour le prochain message
+                    };
+                    if (currentGroupId) {
+                        payload['group_id'] = currentGroupId;
+                    } else {
+                        payload['recipient_id'] = currentRecipientId;
+                    }
+                    socket.emit('send_message', payload);
+                    $('#myMessage').val('');
                 }
             });
 
             $('#myMessage').keypress(function(e) {
                 if(e.which == 13) { $('#sendBtn').click(); }
             }); //on ecoute tout le clavier et quand la touch entrer (13) est input, on peut envoyer le message
+        });
+
+        $('.group-item').on('click', function() { //losqu'on clique sur l'item group
+            var groupId = $(this).data('id'); //Extraction
+            var groupName = $(this).data('name'); //extraction
+            
+            $('#chat-title').html('Groupe : ' + groupName);
+            $('#input-area').show();
+            $('#messages').empty();
+
+            socket.emit('join_group_chat', {'group_id': groupId}); //navigateur informe le serveur qu'on rejoint le group
+            
+            $.get('/get_group_history/' + groupId, function(history) {
+                history.forEach(function(message) {
+                    afficherMessage(message.sender, message.msg, message.timestamp);
+                });
+            }); //recup de l'historique du group 
         });
     </script>
 </body>

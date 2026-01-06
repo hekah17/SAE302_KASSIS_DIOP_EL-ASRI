@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_socketio import SocketIO, send, join_room, emit
-from models import db, User, Message
+from models import db, User, Message, Group
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from sqlalchemy import or_, func
 
@@ -144,6 +144,87 @@ def get_unread_counts():
         .group_by(Message.sender_id).all()
     #requete a la db du nombre de message non lus en fonction de l'username de l'expediteur 
     return jsonify(dict(unread_counts)) #on traduit la requete en json pour save
+
+@app.route('/create_group', methods=['POST'])
+@login_required
+def create_group():
+    group_name = request.form.get('group_name') #extraction du nom du group par le html
+    selected_friend_ids = request.form.getlist('friends_to_add') #extraction des id des amis selectionné pour le group depuis le html
+    
+    if len(selected_friend_ids) >= 50: #verif de la taille du groupe
+        flash("50 participants maximum par groupe.", "error")
+        return redirect(url_for('chat')) #redirige vers la page de chat si excede 50
+
+    new_group = Group(name=group_name) #creation de l'object groupe
+    new_group.members.append(current_user) #ajout d'office du createur du groupe au groupe crée
+    
+    for f_id in selected_friend_ids: #pour chaque amis delectionné
+        friend = User.query.get(int(f_id)) #on extrait son id
+        if friend: #si il existe
+            new_group.members.append(friend) #on ajoute cet amis au nouveau groupe
+            
+    db.session.add(new_group) #preparation de la requete pour la bdd
+    db.session.commit() #envoie de la modif
+    flash(f"Groupe '{group_name}' créé !", "success") #message d'information
+    return redirect(url_for('chat')) #redirection a la page de chat
+
+@socketio.on('join_group_chat')
+def handle_join_group(data):
+    group_id = data['group_id'] #extraction
+    room = f"group_{group_id}" #creation de l'id de la room
+    join_room(room) #on rejoint la room avec l'id crée 
+    emit('group_room_joined', {'room_id': room}) #envoie au navigateur la room de groupe joined
+
+@app.route('/get_group_history/<int:group_id>')
+@login_required
+def get_group_history(group_id):
+    group = Group.query.get_or_404(group_id)
+    if current_user not in group.members: #verif si l'utilisateur fais partie du groupe
+        return jsonify([]), 403 #sinon erruer 403
+
+    messages = Message.query.filter_by(group_id=group_id).order_by(Message.timestamp.asc()).all() #si l'utilisateur fais bien partie du groupe, on recup les messages de ce groupe
+    
+    history = []
+    for msg in messages:
+        history.append({
+            'sender': msg.author.username,
+            'msg': msg.content,
+            'timestamp': msg.timestamp.strftime('%H:%M')
+        })
+    return jsonify(history)
+
+@socketio.on('send_message') 
+def handle_send_message(data):
+    msg_content = data['message']
+    room_id = data['room_id']
+    
+    if 'group_id' in data and data['group_id']: #si c'est un message depuis un groupe et non un utilisateur
+        group_id = data['group_id']
+        new_msg = Message(content=msg_content, sender_id=current_user.id, group_id=group_id)
+        db.session.add(new_msg)
+        db.session.commit()
+        #^recup d'infos
+
+        emit('message_recu', {
+            'msg': msg_content,
+            'sender': current_user.username,
+            'sender_id': None, 
+            'group_id': group_id,
+            'timestamp': new_msg.timestamp.strftime('%H:%M')
+        }, room=room_id)
+        
+    else:
+        recipient_id = data['recipient_id']
+        new_msg = Message(content=msg_content, sender_id=current_user.id, recipient_id=recipient_id)
+        db.session.add(new_msg)
+        db.session.commit()
+        
+        emit('message_recu', {
+            'msg': msg_content,
+            'sender': current_user.username,
+            'sender_id': current_user.id,
+            'timestamp': new_msg.timestamp.strftime('%H:%M')
+        }, room=room_id)
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)#on lance l'application avec le socket pour le coté instantané, avec debug en on pour avoir les log d'erreur

@@ -25,6 +25,18 @@ class User(UserMixin, db.Model):
     messages_sent = db.relationship('Message', backref='author', lazy=True, foreign_keys='Message.sender_id')
     messages_received = db.relationship('Message', backref='recipient', lazy=True, foreign_keys='Message.recipient_id')
 
+#crea de la table d'association des groupes et utilisateurs
+group_members = db.Table('group_members',
+    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
+    db.Column('group_id', db.Integer, db.ForeignKey('group.id'), primary_key=True)
+)
+
+#crea de la table de groupe
+class Group(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    members = db.relationship('User', secondary=group_members, backref='groups') #relation entre la teble d'association group_members et la table de groupe
+
 #crea de la table des messages
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -32,4 +44,5 @@ class Message(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     recipient_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    group_id = db.Column(db.Integer, db.ForeignKey('group.id'), nullable=True)
     is_read = db.Column(db.Boolean, default=False)
