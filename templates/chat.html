@@ -192,6 +192,26 @@
             box-shadow: 0 2px 3px rgba(0,0,0,0.2);
             display: none; 
         }
+
+        .group-item { 
+            padding: 12px 20px; 
+            cursor: pointer; 
+            border-bottom: 1px solid rgba(255,255,255,0.5); 
+            color: #1e395b;
+            display: flex;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .group-item:hover { 
+            background: linear-gradient(to bottom, #f3f8ff 0%, #dbeeff 100%);
+        }
+
+        .group-item.active { 
+            background: linear-gradient(to bottom, #cceeff 0%, #99d6ff 100%);
+            border: 1px solid #559fd6;
+            font-weight: bold;
+        }
     </style>
 </head>
 
@@ -233,34 +253,35 @@
                 </li>
             {% endfor %}
         </ul>
-    </div>
 
-    <div id="sidebar-header" style="margin-top:15px; border-top: 1px solid #a0bfe4;">
-        <strong>Groupes</strong>
-    </div>
+        <div id="sidebar-header" style="margin-top:15px; border-top: 1px solid #a0bfe4;">
+            <strong>Groupes</strong>
+        </div>
 
-    <div id="create-group-area" style="padding: 10px; font-size: 0.8em; background: rgba(255,255,255,0.2);">
-        <form action="{{ url_for('create_group') }}" method="POST">
-            <input type="text" name="group_name" placeholder="Nom du groupe..." required style="width: 90%; margin-bottom: 5px;">
-            <div style="max-height: 100px; overflow-y: auto; background: white; padding: 5px; border-radius: 4px;">
-                <p style="margin: 0 0 5px 0;">Choisir membres (max 49) :</p>
-                {% for friend in user.friends %}
-                    <label style="display: block;">
-                        <input type="checkbox" name="friends_to_add" value="{{ friend.id }}"> {{ friend.username }}
-                    </label>
-                {% endfor %}
-            </div>
-            <button type="submit" style="margin-top: 5px; width: 100%;">Créer Groupe</button>
-        </form>
-    </div>
+        <div id="create-group-area" style="padding: 10px; font-size: 0.8em; background: rgba(255,255,255,0.2);">
+            <form action="{{ url_for('create_group') }}" method="POST">
+                <input type="text" name="group_name" placeholder="Nom du groupe..." required style="width: 90%; margin-bottom: 5px;">
+                <div style="max-height: 100px; overflow-y: auto; background: white; padding: 5px; border-radius: 4px;">
+                    <p style="margin: 0 0 5px 0;">Choisir membres (max 49) :</p>
+                    {% for friend in user.friends %}
+                        <label style="display: block;">
+                            <input type="checkbox" name="friends_to_add" value="{{ friend.id }}"> {{ friend.username }}
+                        </label>
+                    {% endfor %}
+                </div>
+                <button type="submit" style="margin-top: 5px; width: 100%;">Créer Groupe</button>
+            </form>
+        </div>
 
-    <ul id="groups-list">
-        {% for group in user.groups %}
-            <li class="group-item" data-id="{{ group.id }}" data-name="{{ group.name }}">
-                <span style="flex-grow:1;">👥 {{ group.name }}</span>
-            </li>
-        {% endfor %}
-    </ul>
+        <ul id="groups-list">
+            {% for group in user.groups %}
+                <li class="group-item" data-id="{{ group.id }}" data-name="{{ group.name }}">
+                    <span style="flex-grow:1;">👥 {{ group.name }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+
+    </div>
 
     <div id="chat-area"> <!--partie droite de l'écran-->
         <div id="chat-header">
