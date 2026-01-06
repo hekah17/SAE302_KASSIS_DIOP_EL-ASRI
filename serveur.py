@@ -118,8 +118,8 @@ def add_friend():
 @app.route('/get_history/<int:friend_id>')
 @login_required
 def get_history(friend_id):
-    Message.query.filter_by(sender_id=friend_id, recipient_id=current_user.id).update({'is_read': True})
-    db.session.commit() #passage des messages non lus en lus quand ont recup l'historique
+    Message.query.filter_by(sender_id=friend_id, recipient_id=current_user.id).update({'is_read': True}) #update du status des messages à lus
+    db.session.commit() #update : passage des messages non lus en lus quand ont recup l'historique
     messages = Message.query.filter(
         or_(
             (Message.sender_id == current_user.id) & (Message.recipient_id == friend_id),

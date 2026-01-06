@@ -223,7 +223,7 @@
             {% for friend in user.friends %}
                 <li class="friend-item" data-id="{{ friend.id }}" data-name="{{ friend.username }}">
                     <span style="flex-grow:1;">{{ friend.username }}</span>
-                    <span class="badge" id="badge-{{ friend.id }}">0</span>
+                    <span class="badge" id="badge-{{ friend.id }}">0</span> <!--badge à 0 donc invisible-->
                 </li>
             {% else %}
                 <li style="padding: 15px; color: #555; text-align: center; font-style: italic;">
@@ -273,7 +273,7 @@
             $.get('/get_unread_counts', function(counts) {
                 for (var friendId in counts) {
                     updateBadge(friendId, counts[friendId]);
-                }
+                } //au chargement de la page on execute /get_unread_counts
             });
 
             //fontion d'affichage de la bulle de chat
@@ -302,7 +302,7 @@
                 $('.friend-item').removeClass('active'); //on reset le style de tout les items
                 $(this).addClass('active'); //on associe le style à l'item nouvellement cliqué
                 var clickedId = $(this).data('id');
-                updateBadge(clickedId, 0);
+                updateBadge(clickedId, 0); //on reupdate le badge pour le passer à 0
 
                 currentRecipientId = $(this).data('id'); //extraction de l'id de l'amis avec lequel on discute
                 var friendName = $(this).data('name'); //extraction du nom de l'amis avec lequel on discute
@@ -329,9 +329,9 @@
             }); //quand la navigateur recois room_joined du serveur, le navigateur note l'id de la room
 
             socket.on('message_recu', function(data) {
-                if (data.sender_id == currentRecipientId || data.sender === myUsername) {
+                if (data.sender_id == currentRecipientId || data.sender === myUsername) { 
                     afficherMessage(data.sender, data.msg, data.timestamp);
-                } //si on est en ligne, en discussion, on affiche le message normalement, instantanément
+                } //si on est en ligne, en discussion, on affiche le message normalement, instantanément, sans mise à jour du badge
                 else {
                     var badge = $('#badge-' + data.sender_id);
                     var currentCount = parseInt(badge.text()) || 0;
