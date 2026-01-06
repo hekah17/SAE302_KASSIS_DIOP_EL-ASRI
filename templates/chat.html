@@ -357,7 +357,7 @@
             
             //lorsqu'on click sur le feed de discussion d'un amis
             $('.friend-item').on('click', function() {
-                $('.friend-item').removeClass('active'); //on reset le style de tout les items
+                $('.friend-item, .group-item').removeClass('active'); //on reset le style de tout les items
                 $(this).addClass('active'); //on associe le style à l'item nouvellement cliqué
                 var clickedId = $(this).data('id');
                 updateBadge(clickedId, 0); //on reupdate le badge pour le passer à 0
