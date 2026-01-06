@@ -3,7 +3,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_socketio import SocketIO, send, join_room, emit
 from models import db, User, Message
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 
 app = Flask(__name__) #création de l'application __name__
 app.config['SECRET_KEY'] = 'secret' #mesure de sécurité de flask, les cookies, pour qu'un user reste connecté
@@ -50,6 +50,7 @@ def handle_private_message(data):
     emit('message_recu', {
         'msg': msg_content, 
         'sender': current_user.username,
+        'sender_id': current_user.id,
         'timestamp': new_msg.timestamp.strftime('%H:%M')
     }, room=room_id) #evoie du message à tout le monde dans la room
 
@@ -117,6 +118,8 @@ def add_friend():
 @app.route('/get_history/<int:friend_id>')
 @login_required
 def get_history(friend_id):
+    Message.query.filter_by(sender_id=friend_id, recipient_id=current_user.id).update({'is_read': True})
+    db.session.commit() #passage des messages non lus en lus quand ont recup l'historique
     messages = Message.query.filter(
         or_(
             (Message.sender_id == current_user.id) & (Message.recipient_id == friend_id),
@@ -132,6 +135,15 @@ def get_history(friend_id):
         }) #append de la liste d'historique en forme lisible en javascript
 
     return jsonify(history) #envoir des données en JSON
+
+@app.route('/get_unread_counts')
+@login_required
+def get_unread_counts():
+    unread_counts = db.session.query(Message.sender_id, func.count(Message.id))\
+        .filter_by(recipient_id=current_user.id, is_read=False)\
+        .group_by(Message.sender_id).all()
+    #requete a la db du nombre de message non lus en fonction de l'username de l'expediteur 
+    return jsonify(dict(unread_counts)) #on traduit la requete en json pour save
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)#on lance l'application avec le socket pour le coté instantané, avec debug en on pour avoir les log d'erreur

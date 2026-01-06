@@ -180,6 +180,18 @@
         .alert { padding: 10px; margin: 10px; border-radius: 5px; text-align: center; border: 1px solid rgba(0,0,0,0.1); font-size: 0.9em; }
         .alert.error { background: #ffebeb; color: #d00; border-color: #ffcccc; }
         .alert.success { background: #eaffea; color: #008000; border-color: #ccffcc; }
+        
+        .badge {
+            background-color: #ff3b30;
+            color: white;
+            font-size: 0.75em;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 10px; 
+            margin-left: 10px;
+            box-shadow: 0 2px 3px rgba(0,0,0,0.2);
+            display: none; 
+        }
     </style>
 </head>
 
@@ -211,6 +223,7 @@
             {% for friend in user.friends %}
                 <li class="friend-item" data-id="{{ friend.id }}" data-name="{{ friend.username }}">
                     <span style="flex-grow:1;">{{ friend.username }}</span>
+                    <span class="badge" id="badge-{{ friend.id }}">0</span>
                 </li>
             {% else %}
                 <li style="padding: 15px; color: #555; text-align: center; font-style: italic;">
@@ -245,6 +258,23 @@
             var currentRecipientId = null; //initialisation d'une variable pour le destinataire 
             var currentRoomId = null; //initialisation d'une variable de l'id de la room de discussion
             var myUsername = "{{ user.username }}"; //initialisation du pseudo de l'user
+            
+            function updateBadge(friendId, count) {
+                var badge = $('#badge-' + friendId);
+                if (count > 0) {
+                    badge.text(count);
+                    badge.show(); 
+                } else {
+                    badge.text('0');
+                    badge.hide(); 
+                }
+            }
+
+            $.get('/get_unread_counts', function(counts) {
+                for (var friendId in counts) {
+                    updateBadge(friendId, counts[friendId]);
+                }
+            });
 
             //fontion d'affichage de la bulle de chat
             function afficherMessage(sender, msg, timestamp) {
@@ -271,6 +301,8 @@
             $('.friend-item').on('click', function() {
                 $('.friend-item').removeClass('active'); //on reset le style de tout les items
                 $(this).addClass('active'); //on associe le style à l'item nouvellement cliqué
+                var clickedId = $(this).data('id');
+                updateBadge(clickedId, 0);
 
                 currentRecipientId = $(this).data('id'); //extraction de l'id de l'amis avec lequel on discute
                 var friendName = $(this).data('name'); //extraction du nom de l'amis avec lequel on discute
@@ -297,8 +329,16 @@
             }); //quand la navigateur recois room_joined du serveur, le navigateur note l'id de la room
 
             socket.on('message_recu', function(data) {
-                afficherMessage(data.sender, data.msg, data.timestamp);
-            }); //lorsque le navigateur recois message_recu, il lance afficherMessage
+                if (data.sender_id == currentRecipientId || data.sender === myUsername) {
+                    afficherMessage(data.sender, data.msg, data.timestamp);
+                } //si on est en ligne, en discussion, on affiche le message normalement, instantanément
+                else {
+                    var badge = $('#badge-' + data.sender_id);
+                    var currentCount = parseInt(badge.text()) || 0;
+                    
+                    updateBadge(data.sender_id, currentCount + 1);
+                } //si on est pas en discussion, on actualise le badge de notification incrémentalement
+            });
 
             //quand on appuie sur Envoyer
             $('#sendBtn').on('click', function() {
