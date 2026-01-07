@@ -284,6 +284,7 @@
             {% for group in user.groups %}
                 <li class="group-item" data-id="{{ group.id }}" data-name="{{ group.name }}">
                     <span style="flex-grow:1;">👥 {{ group.name }}</span>
+                    <span class="badge" id="group-badge-{{ group.id }}">0</span>
                 </li>
             {% endfor %}
         </ul>
@@ -317,8 +318,8 @@
             var currentGroupId = null; //initialisation d'une variable de l'id de la room de discussion de groupe
             var myUsername = "{{ user.username }}"; //initialisation du pseudo de l'user
             
-            function updateBadge(friendId, count) {
-                var badge = $('#badge-' + friendId);
+            function updateBadge(friendId, count, prefix = 'badge-') {
+                var badge = $('#' + prefix + friendId);
                 if (count > 0) {
                     badge.text(count);
                     badge.show(); 
@@ -330,7 +331,7 @@
 
             $.get('/get_unread_counts', function(counts) {
                 for (var friendId in counts) {
-                    updateBadge(friendId, counts[friendId]);
+                    updateBadge(friendId, counts[friendId], 'badge-');
                 } //au chargement de la page on execute /get_unread_counts
             });
 
@@ -360,9 +361,10 @@
                 $('.friend-item, .group-item').removeClass('active'); //on reset le style de tout les items
                 $(this).addClass('active'); //on associe le style à l'item nouvellement cliqué
                 var clickedId = $(this).data('id');
-                updateBadge(clickedId, 0); //on reupdate le badge pour le passer à 0
+                updateBadge(clickedId, 0, 'badge-'); //on reupdate le badge pour le passer à 0
 
-                currentRecipientId = $(this).data('id'); //extraction de l'id de l'amis avec lequel on discute
+                currentRecipientId = clickedId;
+                currentGroupId = null; 
                 var friendName = $(this).data('name'); //extraction du nom de l'amis avec lequel on discute
 
                 $('#chat-title').html('Discussion avec ' + friendName); //changement du titre du chat
@@ -388,6 +390,9 @@
                 
                 currentGroupId = $(this).data('id'); //on prend l'id du group
                 currentRecipientId = null; //changement de la varibale d'id pricé en null
+
+                updateBadge(currentGroupId, 0, 'group-badge-');
+
                 var groupName = $(this).data('name'); //crea de la var de nom du group
 
                 $('#chat-title').html('Groupe : ' + groupName);
@@ -411,17 +416,24 @@
             }); //quand la navigateur recois room_joined du serveur, le navigateur note l'id de la room
 
             socket.on('message_recu', function(data) {
-                if (data.group_id && data.group_id == currentGroupId) {
-                    afficherMessage(data.sender, data.msg, data.timestamp);
-                } //quand on a un message sur le groupe et le feed de discussion est ouvert
-                else if (!data.group_id && (data.sender_id == currentRecipientId || data.sender === myUsername)) {
-                    afficherMessage(data.sender, data.msg, data.timestamp);
-                } //quand on a un messsage sur une discussion privé et que le feed est ouvert
-                else if (!data.group_id && data.sender_id) {
-                    var badge = $('#badge-' + data.sender_id);
-                    var currentCount = parseInt(badge.text()) || 0;
-                    updateBadge(data.sender_id, currentCount + 1);
-                } //si on est pas en discussion, on actualise le badge de notification incrémentalement
+                if (data.group_id) { //si c'est un message de groupe
+                    if (data.group_id == currentGroupId) { //si le feed est ouvert on affiche le message instentanément
+                        afficherMessage(data.sender, data.msg, data.timestamp);
+                    } else { //si on est pas sur le feed, on update le badge
+                        var badge = $('#group-badge-' + data.group_id);
+                        var currentCount = parseInt(badge.text()) || 0;
+                        updateBadge(data.group_id, currentCount + 1, 'group-badge-');
+                    }
+                } 
+                else { //si c'est un mp
+                    if (data.sender_id == currentRecipientId || data.sender === myUsername) {// si le feed est ouvert
+                        afficherMessage(data.sender, data.msg, data.timestamp);
+                    } else if (data.sender_id) {
+                        var badge = $('#badge-' + data.sender_id);
+                        var currentCount = parseInt(badge.text()) || 0;
+                        updateBadge(data.sender_id, currentCount + 1, 'badge-');
+                    }
+                }
             });
 
             //quand on appuie sur Envoyer
