@@ -54,6 +54,47 @@ def handle_private_message(data):
         'timestamp': new_msg.timestamp.strftime('%H:%M')
     }, room=room_id) #evoie du message à tout le monde dans la room
 
+@socketio.on('send_message') 
+def handle_send_message(data):
+    msg_content = data['message']
+    room_id = data['room_id']
+    
+    if 'group_id' in data and data['group_id']: #si c'est un message depuis un groupe et non un utilisateur
+        group_id = data['group_id']
+        new_msg = Message(content=msg_content, sender_id=current_user.id, group_id=group_id)
+        db.session.add(new_msg)
+        db.session.commit()
+        #^recup d'infos
+
+        emit('message_recu', {
+            'msg': msg_content,
+            'sender': current_user.username,
+            'sender_id': current_user.id, 
+            'group_id': group_id,
+            'timestamp': new_msg.timestamp.strftime('%H:%M')
+        }, room=room_id)
+        
+    else:
+        recipient_id = data['recipient_id']
+        new_msg = Message(content=msg_content, sender_id=current_user.id, recipient_id=recipient_id)
+        db.session.add(new_msg)
+        db.session.commit()
+        
+        emit('message_recu', {
+            'msg': msg_content,
+            'sender': current_user.username,
+            'sender_id': current_user.id,
+            'timestamp': new_msg.timestamp.strftime('%H:%M')
+        }, room=room_id)
+
+@socketio.on('connect') #reponse au probleme de badge : pour voir les badge de notif de groupe, il faut que le nombre de notif ne soit pas null mais pour se connecter à un groupe et ainsi avoir accès aux notif, il faut cliquer sur le feed mais ducoup, le nombre de message non lus est toujours à 0
+def handle_connect():
+    if current_user.is_authenticated:
+        join_room(f"user_{current_user.id}") #on se connecte à notre propre room
+        for group in current_user.groups:
+            join_room(f"group_{group.id}") #on se connecte a tout les groupes
+        print(f"Connecté : {current_user.username} a rejoint ses salons de groupe.")
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST': #si l'utilisateur clique sur s'inscrire
@@ -173,7 +214,7 @@ def handle_join_group(data):
     group_id = data['group_id'] #extraction
     room = f"group_{group_id}" #creation de l'id de la room
     join_room(room) #on rejoint la room avec l'id crée 
-    emit('group_room_joined', {'room_id': room}) #envoie au navigateur la room de groupe joined
+    emit('room_joined', {'room_id': room}) #envoie au navigateur la room de groupe joined
 
 @app.route('/get_group_history/<int:group_id>')
 @login_required
@@ -192,39 +233,6 @@ def get_group_history(group_id):
             'timestamp': msg.timestamp.strftime('%H:%M')
         })
     return jsonify(history)
-
-@socketio.on('send_message') 
-def handle_send_message(data):
-    msg_content = data['message']
-    room_id = data['room_id']
-    
-    if 'group_id' in data and data['group_id']: #si c'est un message depuis un groupe et non un utilisateur
-        group_id = data['group_id']
-        new_msg = Message(content=msg_content, sender_id=current_user.id, group_id=group_id)
-        db.session.add(new_msg)
-        db.session.commit()
-        #^recup d'infos
-
-        emit('message_recu', {
-            'msg': msg_content,
-            'sender': current_user.username,
-            'sender_id': None, 
-            'group_id': group_id,
-            'timestamp': new_msg.timestamp.strftime('%H:%M')
-        }, room=room_id)
-        
-    else:
-        recipient_id = data['recipient_id']
-        new_msg = Message(content=msg_content, sender_id=current_user.id, recipient_id=recipient_id)
-        db.session.add(new_msg)
-        db.session.commit()
-        
-        emit('message_recu', {
-            'msg': msg_content,
-            'sender': current_user.username,
-            'sender_id': current_user.id,
-            'timestamp': new_msg.timestamp.strftime('%H:%M')
-        }, room=room_id)
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)#on lance l'application avec le socket pour le coté instantané, avec debug en on pour avoir les log d'erreur

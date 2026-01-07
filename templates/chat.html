@@ -419,7 +419,7 @@
                 if (data.group_id) { //si c'est un message de groupe
                     if (data.group_id == currentGroupId) { //si le feed est ouvert on affiche le message instentanément
                         afficherMessage(data.sender, data.msg, data.timestamp);
-                    } else { //si on est pas sur le feed, on update le badge
+                    } else if (data.sender !== myUsername){ //si on est pas sur le feed, on update le badge
                         var badge = $('#group-badge-' + data.group_id);
                         var currentCount = parseInt(badge.text()) || 0;
                         updateBadge(data.group_id, currentCount + 1, 'group-badge-');
@@ -460,22 +460,6 @@
             }); //on ecoute tout le clavier et quand la touch entrer (13) est input, on peut envoyer le message
         });
 
-        $('.group-item').on('click', function() { //losqu'on clique sur l'item group
-            var groupId = $(this).data('id'); //Extraction
-            var groupName = $(this).data('name'); //extraction
-            
-            $('#chat-title').html('Groupe : ' + groupName);
-            $('#input-area').show();
-            $('#messages').empty();
-
-            socket.emit('join_group_chat', {'group_id': groupId}); //navigateur informe le serveur qu'on rejoint le group
-            
-            $.get('/get_group_history/' + groupId, function(history) {
-                history.forEach(function(message) {
-                    afficherMessage(message.sender, message.msg, message.timestamp);
-                });
-            }); //recup de l'historique du group 
-        });
     </script>
 </body>
 </html>
