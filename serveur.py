@@ -87,14 +87,6 @@ def handle_send_message(data):
             'timestamp': new_msg.timestamp.strftime('%H:%M')
         }, room=room_id)
 
-@socketio.on('connect') #reponse au probleme de badge : pour voir les badge de notif de groupe, il faut que le nombre de notif ne soit pas null mais pour se connecter à un groupe et ainsi avoir accès aux notif, il faut cliquer sur le feed mais ducoup, le nombre de message non lus est toujours à 0
-def handle_connect():
-    if current_user.is_authenticated:
-        join_room(f"user_{current_user.id}") #on se connecte à notre propre room
-        for group in current_user.groups:
-            join_room(f"group_{group.id}") #on se connecte a tout les groupes
-        print(f"Connecté : {current_user.username} a rejoint ses salons de groupe.")
-
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST': #si l'utilisateur clique sur s'inscrire
@@ -180,11 +172,20 @@ def get_history(friend_id):
 @app.route('/get_unread_counts')
 @login_required
 def get_unread_counts():
-    unread_counts = db.session.query(Message.sender_id, func.count(Message.id))\
+    unread_private = db.session.query(Message.sender_id, func.count(Message.id))\
         .filter_by(recipient_id=current_user.id, is_read=False)\
-        .group_by(Message.sender_id).all()
-    #requete a la db du nombre de message non lus en fonction de l'username de l'expediteur 
-    return jsonify(dict(unread_counts)) #on traduit la requete en json pour save
+        .group_by(Message.sender_id).all() #requete de compte des messages privé non lu
+    user_groups_ids = [g.id for g in current_user.groups] #lsite des id des groupe de l'user²
+    unread_groups = []
+    if user_groups_ids: #si il y a des groupes rejoint
+        unread_groups = db.session.query(Message.group_id, func.count(Message.id))\
+            .filter(Message.group_id.in_(user_groups_ids))\
+            .filter(Message.is_read == False)\
+            .group_by(Message.group_id).all()
+    return jsonify({
+        'private': dict(unread_private),
+        'groups': dict(unread_groups)
+    }) #retourne les données par mp et group
 
 @app.route('/create_group', methods=['POST'])
 @login_required
@@ -222,6 +223,9 @@ def get_group_history(group_id):
     group = Group.query.get_or_404(group_id)
     if current_user not in group.members: #verif si l'utilisateur fais partie du groupe
         return jsonify([]), 403 #sinon erruer 403
+
+    Message.query.filter_by(group_id=group_id, is_read=False).update({'is_read': True}) #update des messages en lu
+    db.session.commit() #envoie de la requete
 
     messages = Message.query.filter_by(group_id=group_id).order_by(Message.timestamp.asc()).all() #si l'utilisateur fais bien partie du groupe, on recup les messages de ce groupe
     
