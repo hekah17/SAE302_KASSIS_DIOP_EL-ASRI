@@ -435,7 +435,7 @@
                 else { //si c'est un mp
                     if (data.sender_id == currentRecipientId || data.sender === myUsername) {// si le feed est ouvert
                         afficherMessage(data.sender, data.msg, data.timestamp);
-                    } else if (data.sender_id && data.sender !== myUsername) 
+                    } else if (data.sender_id && data.sender !== myUsername) {
                         var badge = $('#badge-' + data.sender_id);
                         var currentCount = parseInt(badge.text()) || 0;
                         updateBadge(data.sender_id, currentCount + 1, 'badge-');
